@@ -1,0 +1,1 @@
+BiocGenerics:::testPackage("M3D")

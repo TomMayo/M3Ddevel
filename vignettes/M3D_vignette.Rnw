@@ -1,0 +1,260 @@
+%\VignetteIndexEntry{An Introduction to the M$^3$D method}
+%\VignetteKeywords{M3D, methylation, kernel methods}
+%\VignetteDepends{BiSeq}
+%\VignettePackage{M3D}
+%\VignetteEngine{knitr::knitr}
+
+\documentclass{article}
+
+<<style-Sweave, eval=TRUE, echo=FALSE, results='asis'>>=
+BiocStyle::latex()
+@
+
+\title{M$^3$D: Statistical Testing for RRBS Data Sets}
+\author{Tom Mayo}
+\date{Modified: 12 Aug, 2014. Compiled: \today}
+
+\begin{document}
+
+
+\maketitle
+
+\tableofcontents
+
+
+\section{Introduction}
+
+RRBS experiments offer a cost-effective method for measuring the methylation levels of cytosines in CpG dense regions. Statistical testing for differences in CpG methylation between sample groups typically involves beta-binomial modelling of CpG loci individually and testing across samples, such as with the BiSeq and MethylSig packages. Individual CpGs are then chained together to output a list of putative differentially methylated regions (DMRs).
+
+We take a different approach, instead testing pre-defined regions of interest for changes in the distribution of the methylation profiles. Changes are compared to inter-replicate differences to establish which regions vary in a manner that cannot be explained by replicate variation alone. We utilise the maximum mean discrepancy (MMD) \cite{gretton2007kernel} to perform the test, adjusting this measure to account for changes in the coverage profile between the testing groups. 
+
+In this vignette, we run through an analysis of a toy data set using the M$^3$D method. We use the same data structures as the 'BiSeq' package, and assume that we have data stored in an rrbs structure with an accompanying GRanges object describing the regions of interest we want to test. For a fuller explanation and exploration of the method, please see the open access journal article \cite{mayo2014m3d}.
+
+
+\section{Analysis Pipeline}
+
+\subsection{Reading in Data}
+
+We use the same data structures as the 'BiSeq' package. Please see their manual for data handling.
+
+For illustrative purposes, we have included data from two RRBS datasets via the ENCODE consortium \cite{encode2012integrated}, namely the H1-hESC human embryonic stem cells and the K562 leukemia cell line.  We clustered the data using the 'clusterSites' and 'clusterSitesToGR' functions in the BiSeq package, removed any islands with a total coverage of less than 100 in any island over any sample and included only the first 1000.  Full details of where to download the data and how to read it in are included in the section 'Using ENCODE Data', so that this toy set and the corresponding full data set can be used.
+
+We load and show the data with the following.
+
+<<setup,message=FALSE>>=
+library(BiSeq)
+library(M3D)
+@
+
+<<>>=
+data(rrbsDemo)
+rrbsDemo
+@
+ 
+ The regions to be tested are stored in a Granges object, with each entry representing the start and end of the region. This can be loaded as follows:
+ 
+<<>>=
+data(CpGsDemo)
+CpGsDemo
+@
+ 
+\subsection{Computing the MMD, and coverage-MMD}
+
+The M$^3$D test statistic is calculated by finding the maximum mean discrepancy, over each island, of the full methylation data and the coverage data. Both of these are achieved using the M3D\textunderscore Wrapper function. This outputs a list, with the first entry being a matrix of the pairwise full, methylation aware MMD of each possible sample pair, and the second being the coverage only equivalent. 
+
+The function requires a list of overlap locations, which we create as follows:
+
+<<>>=
+data(CpGsDemo)
+data(rrbsDemo)
+overlaps <- findOverlaps(CpGsDemo,rowRanges(rrbsDemo))
+@
+
+The components of the M$^3$D statistic are then generated with the code:
+<<eval=FALSE>>=
+MMDlistDemo <- M3D_Wrapper(rrbsDemo, overlaps)
+@
+
+Alternatively, you can load this data directly:
+
+<<>>=
+data(MMDlistDemo)
+@
+
+We show the structure of each entry, where column names correspond to the sample pairs being tested.
+
+<<>>=
+# the full MMD
+head(MMDlistDemo$Full)
+# the coverage only MMD
+head(MMDlistDemo$Coverage)
+@
+
+The M$^3$D test statistic uses the difference between these values. 
+
+<<>>=
+M3Dstat <- MMDlistDemo$Full-MMDlistDemo$Coverage
+@
+
+In the matrices we have stored, we can see from the column names that the columns pertaining to inter-replicate values are 1 and 6, while 2 to 5 detail inter-group comparisons, since there are . We can plot the values for replicates as follows:
+
+<<M3DstatPlot>>=
+repCols <- c(1,6)
+plot(as.vector(MMDlistDemo$Full[,repCols]),
+    as.vector(MMDlistDemo$Coverage[,repCols]),
+    xlab='Full MMD',ylab='Coverage MMD')
+    title('Test Statistics: Replicate Comparison')
+abline(a=0,b=1,col='red',lwd=2)    
+@
+
+And analogously for the inter-group values. Note that with the replicates, the values are close to the red line, representing equality. With the inter-group metrics, we see that, with some of the regions, the full MMD is greater than the coverage only version. This forms the basis of the M$^3$D test statistic, which is used in the following section.
+
+<<M3DstatBetweenPlot>>=
+groupCols <- 2:5
+plot(as.vector(MMDlistDemo$Full[,groupCols]),
+    as.vector(MMDlistDemo$Coverage[,groupCols]),
+    xlab='Full MMD',ylab='Coverage MMD')
+title('Test Statistics: Inter-Group Comparison')
+abline(a=0,b=1,col='red',lwd=2)   
+@
+
+This can be summarised in a histogram of the M$^3$D test statistics.
+<<M3DhistPlot>>=
+repCols <- c(1,6)
+groupCols <- 2:5
+M3Dstat <- MMDlistDemo$Full - MMDlistDemo$Coverage
+breaks <- seq(-0.2,1.2,0.1)
+# WT reps
+hReps <- hist(M3Dstat[,repCols], breaks=breaks,plot=FALSE)
+# mean between groups
+hGroups <- hist(rowMeans(M3Dstat[,groupCols]),breaks=breaks,plot=FALSE)
+col1 <- "#0000FF40"
+col2 <- "#FF000040"
+plot(hReps,col=col1, freq=FALSE, ylab='Density',
+    xlab='MMD statistic', main= 'M3D Stat Histogram')
+plot(hGroups, col=col2, freq=FALSE, add=TRUE)
+legend(x=0.5, y =3, legend=c('Replicates', 'Groups'), fill=c(col1, col2))
+@
+
+
+\subsection{Generating p-values}
+
+P-values are calculated by using the M$^3$D test statistic observed between all of the replicates - our 'null' distribution. For each island, we take the mean of the inter-group test-statistics, and calculate the likelihood of observing that value or higher among the  inter-replicate values.
+
+We provide two methods for this calculation. 'empirical' gives the empirical probabilities, and is the default method. In the event that we see M$^3$D test statistics between groups above the range of the inter-replicate values, we get p-values of 0. This is not a concern for large samples, but in case of small samples, we recommend using the 'model' option, whereby an exponential is fitted to the tails of the distribution and p-values are calculated from the exponential.
+
+
+The function 'pvals' computes this, taking in the raw data, the regions, the test statistic and the names of the two groups being compared as stored in the rrbs object.
+
+This outputs a list with 2 entries. The one we are concerned with is FDRmean, the adjusted p-values for each region. The unadjusted values are stored in 'Pmean'.
+
+The structure can be explored with:
+
+<<>>=
+data(PDemo)
+@
+
+Or calculated via: 
+
+<<>>=
+group1 <- unique(colData(rrbsDemo)$group)[1]
+group2 <-unique(colData(rrbsDemo)$group)[2]
+PDemo <- pvals(rrbsDemo, CpGsDemo, M3Dstat,
+    group1, group2, smaller=FALSE, comparison='allReps', method='empirical', closePara=0.005)
+head(PDemo$FDRmean)
+@
+
+PDemo\$FDRlist is then a vector with an adjusted p-value for each region being tested. To find which regions fall below a certain threshold, we can test very simply. For example, using a cut off FDR of 1\%:
+
+<<>>=
+called <- which(PDemo$FDRmean<=0.01)
+head(called)
+head(CpGsDemo[called])
+@
+
+We can use the function 'plotMethProfile' to view a smoothed methylation profile for the called regions, taking the mean of the individual methylation levels within each group.
+
+<<>>=
+par(mfrow=c(2,2))
+for (i in 1:4){
+    CpGindex <- called[i]
+    plotMethProfile(rrbsDemo, CpGsDemo, 'H1-hESC', 'K562', CpGindex)
+}
+@
+
+\section{Using ENCODE data}
+
+This section will demonstrate how to load ENCODE RRBS data for use with the package. Data is available for download from: \url{http://hgdownload.cse.ucsc.edu/goldenPath/hg19/encodeDCC/wgEncodeHaibMethylRrbs/}
+
+For this package we have used the H1-ESC and K562 cell lines, each of which have two replicates. We therefore download the files named:  'wgEncodeHaibMethylRrbsH1hescHaibSitesRep1.bed.gz', 'wgEncodeHaibMethylRrbsH1hescHaibSitesRep2.bed.gz', 'wgEncodeHaibMethylRrbsK562HaibSitesRep1.bed.gz' and 'wgEncodeHaibMethylRrbsK562HaibSitesRep2.bed.gz'. 
+
+To load in the data, change directory to the location of the 4 files named above and use the readENCODEdata function provided in the package. This function is a adaption of BiSeq's readBismark file to handle this format. Unfortunately, RRBS data files frequently have differing layouts, but this function is readily adaptable to new layouts.
+
+<<eval=FALSE>>=
+# change working directory to the location of the files
+group <- factor(c('H1-hESC','H1-hESC','K562','K562'))
+samples <- c('H1-hESC1','H1-hESC2','K562-1','K562-2')
+colData <- DataFrame(group,row.names= samples)
+files <- c('wgEncodeHaibMethylRrbsH1hescHaibSitesRep1.bed.gz',
+           'wgEncodeHaibMethylRrbsH1hescHaibSitesRep2.bed.gz',
+           'wgEncodeHaibMethylRrbsK562HaibSitesRep1.bed.gz',
+           'wgEncodeHaibMethylRrbsK562HaibSitesRep2.bed.gz')  
+rrbs <- readENCODEdata(files,colData)
+@
+
+We then generate the GRanges file of regions as in the BiSeq package (if we are not using a list of regions of interest).
+
+<<eval=FALSE>>=
+# Create the CpGs
+rrbs.CpGs <- clusterSites(object=rrbs,groups=unique(colData(rrbs)$group),
+                          perc.samples = 3/4, min.sites = 20, max.dist=100)
+CpGs <- clusterSitesToGR(rrbs.CpGs)
+@
+
+In this example, we cut out regions with a total coverage of less than 100 in each sample, which is performed as follows:
+
+<<eval=FALSE>>=
+inds <- vector()
+overlaps <- findOverlaps(CpGs,rowRanges(rrbs.CpGs))
+for (i in 1:length(CpGs)){
+  covs <- colSums(totalReads(rrbs.CpGs)[subjectHits(
+  	overlaps[queryHits(overlaps)==i]),])
+  if (!any(covs<=100)){
+    inds <- c(inds,i)
+  }
+}
+CpGs <- CpGs[inds]
+rm(inds)
+@
+
+Next, to create the toy dataset here, we took only the first 1000 regions. It is important to update the 'overlaps' object if you do this, so that it details the overlaps between the right objects.
+<<eval=FALSE>>=
+# reduce the rrbs to only the cytosine sites within regions
+rrbs <- rrbs.CpGs
+CpGs <- CpGs[1:1000] # first 1000 regions
+overlaps <- findOverlaps(CpGs,rowRanges(rrbs))
+rrbs <- rrbs[subjectHits(overlaps)]
+overlaps <- findOverlaps(CpGs,rowRanges(rrbs))
+@
+
+Following these steps produces the toy data in this package.
+
+\section{Acknowledgements} 
+ This package was developed at the University of Edinburgh in the School of Informatics, with support from Guido Sanguinetti and Gabriele Schweikert.
+ 
+ The work was supported by grants EP/F500385/1 and BB/F529254/1
+from the UK Engineering and Physical Sciences Research Council,
+UK Biotechnology and Biological Sciences Research Council, and
+the UK Medical Research Council.
+
+\section{sessionInfo()}
+
+This vignette was built using:
+
+<<>>=
+sessionInfo()
+@
+
+\bibliography{M3D_vignette}
+
+\end{document}

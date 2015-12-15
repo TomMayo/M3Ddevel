@@ -1,0 +1,19 @@
+**************************************************
+*	       1.0 SERIES NEWS			 *
+**************************************************
+
+First package release. News and details of updates will be added to this file in future releases.
+
+1.0.1 – pvals function modified to include the option for modelling the null distibution. Link to arXiv report in the vignette added.
+
+1.0.2 - parallel version (via M3D_Para function) added. Link to the Bioinformatics paper added to the vignette.
+
+1.0.3 - fix warnings in bioconductor daily build
+
+1.3.3 - fix bug in readENCODEdata, based on changes to underlying rrbs() function in BiSeq. This will have no effect on workflows.
+
+1.3.4 update man page for readENCODEdata to account for previous update
+
+1.3.6 Optimised code to speed up the process. This now runs approximately 5x faster, with parallel implementation significantly better.
+
+1.3.9 Minor speed ups.
