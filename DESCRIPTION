@@ -1,21 +1,33 @@
 Package: M3Ddevel
 Type: Package
-Title: (development for M3D) Identifies differentially methylated regions across testing
-        groups
+Title: (development for M3D) Identifies differentially methylated regions across
+    testing groups
 Version: 1.5.0
 Date: 2015-09-17
 Author: Tom Mayo
 Maintainer: Tom Mayo <t.mayo@ed.ac.uk>
-Description: (This package serves as development for the M3D Bioconductor package) This package identifies statistically significantly differentially
+Description: (This package serves as development for the M3D Bioconductor
+    package) This package identifies statistically significantly differentially
     methylated regions of CpGs. It uses kernel methods (the Maximum Mean
     Discrepancy) to measure differences in methylation profiles, and relates
-    these to inter-replicate changes, whilst accounting for variation in
-    coverage profiles.
+    these to inter-replicate changes, whilst accounting for variation in coverage
+    profiles.
 License: Artistic License 2.0
-Imports: GenomicRanges, IRanges, BiSeq, parallel
-Depends: R (>= 3.0.0)
+Imports:
+    GenomicRanges,
+    IRanges,
+    BiSeq,
+    parallel,
+    Rcpp
+LinkingTo: Rcpp
+Depends:
+    R (>= 3.0.0)
 VignetteBuilder: knitr
-Suggests: BiocStyle, knitr, RUnit, BiocGenerics
+Suggests:
+    BiocStyle,
+    knitr,
+    testthat
 biocViews: DNAMethylation, DifferentialMethylation, Coverage, CpGIsland
 NeedsCompilation: no
 Packaged: 2015-10-14 04:49:06 UTC; biocbuild
+RoxygenNote: 5.0.1
