@@ -12,6 +12,7 @@
 #' @param group2 The name of the second testing group
 #' @param CpGindex The index within the CpGs object of the region we are 
 #' plotting
+#' @param plot_title Optional title for the plot, overrides automatic title
 #' @return NULL, the function plots the profiles
 #' @export
 #' @author Tom Mayo \email{t.mayo@@ed.ac.uk}
@@ -21,7 +22,7 @@
 #' data(CpGsDemo)
 #' plotMethProfile(rrbsDemo, CpGsDemo, 'H1-hESC', 'K562', 9)
 
-plotMethProfile<- function(rrbs,CpGs,group1,group2,CpGindex){
+plotMethProfile<- function(rrbs,CpGs,group1,group2,CpGindex, plot_title=NaN){
   Ov <- findOverlaps(CpGs[CpGindex],rowRanges(rrbs))
   CpGisland <- rowRanges(rrbs)[subjectHits(Ov)]
   if (length(CpGisland)==0){   # in case we pass an empty island
@@ -82,5 +83,9 @@ plotMethProfile<- function(rrbs,CpGs,group1,group2,CpGindex){
   title(ylab='Methylation Level')
   xlabel = paste(unique(seqnames(CpGisland)),unique(strand(CpGisland)),sep=', ')
   title(xlab=xlabel)
-  title(main=paste("Island",CpGindex,sep=' '), font.main=4)
+  if (is.na(plot_title)){
+      title(main=paste("Island",CpGindex,sep=' '), font.main=3)
+  } else {
+      title(main=plot_title, font.main=3)
+  }
 }

@@ -11,6 +11,7 @@
 #' @return Returns the median value of the data comprising each entry in values
 #'  repeated the corresponding entry in freqs number of times, as a numeric.
 #' @author Tom Mayo \email{t.mayo@@ed.ac.uk}
+#' @export
 median_freq <- function(values, freqs) {
     .Call('M3Ddevel_median_freq', PACKAGE = 'M3Ddevel', values, freqs)
 }

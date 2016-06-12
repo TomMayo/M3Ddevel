@@ -11,6 +11,7 @@ using namespace Rcpp;
 //' @return Returns the median value of the data comprising each entry in values
 //'  repeated the corresponding entry in freqs number of times, as a numeric.
 //' @author Tom Mayo \email{t.mayo@@ed.ac.uk}
+//' @export
 // [[Rcpp::export]]
 double median_freq(NumericVector values, IntegerVector freqs) {
     const int len = freqs.size();

@@ -15,6 +15,7 @@
 #'  in colData(rrbs). Default finds first unique group in colData(rrbs).
 #' @param group2 The name of the second group for the comparison. This is stored
 #'  in colData(rrbs). Default finds second unique group in colData(rrbs).
+#' @param verbose Logical vector. If true, the function prints a progress bar.
 #' @return This returns the two components of the M3D test-statistic for each
 #'  region over all sample pairs as a matrix.
 #' Subtracting them gives the M3D test-statistic. This is processed with the
@@ -31,7 +32,7 @@
 #' head(M3d_list)}
 #' @export
 
-M3D_Wrapper_lite <- function(rrbs, overlaps, group1=NaN, group2=NaN){
+M3D_Wrapper_lite <- function(rrbs, overlaps, group1=NaN, group2=NaN, verbose = TRUE){
     if (is.na(group1)){
         group1 <- as.character(unique(colData(rrbs)$group)[1])
     }
@@ -57,14 +58,17 @@ M3D_Wrapper_lite <- function(rrbs, overlaps, group1=NaN, group2=NaN){
     sub_hits <- subjectHits((overlaps))
 
     ### make colnames - vectorize
+    all_sample_names <- rownames(colData(rrbs))[colData(rrbs)$group==group1]
+    all_sample_names <- c(all_sample_names,
+                          rownames(colData(rrbs))[colData(rrbs)$group==group2])
     ColumnNames <- unlist(lapply(1:numPairs, function(pairInd){
         if (numPairs==1){
             pair <- c(1,2)
         } else {
             pair <- samplesIdx[pairInd,]
         }
-        sample1 <- colnames(m_reads)[pair[1]]
-        sample2 <- colnames(m_reads)[pair[2]]
+        sample1 <- all_sample_names[pair[1]]
+        sample2 <- all_sample_names[pair[2]]
         return(paste(sample1, ' vs ', sample2))
     }))
 
@@ -85,10 +89,12 @@ M3D_Wrapper_lite <- function(rrbs, overlaps, group1=NaN, group2=NaN){
 
     islands <- unique(queryHits(overlaps))
     M3D_stat <- matrix(NA,nrow=length(islands),ncol=1+length(idsWithin))
-    col_sample_names <- colnames(m_reads)
+    col_sample_names <- c(samples1, samples2)
 
     # loop over islands, then over samples
-    pb <- txtProgressBar(min=1,max=length(islands),style=3)
+    if(verbose){
+        pb <- txtProgressBar(min=1,max=length(islands),style=3)
+    }
     for (i in 1:length(islands)) {
         island <- islands[i]
         methIndices <- sub_hits[q_hits==island]
@@ -132,9 +138,13 @@ M3D_Wrapper_lite <- function(rrbs, overlaps, group1=NaN, group2=NaN){
         }
         M3D_stat[i,1] <- mean(temp[idsBetween],na.rm=TRUE)
         M3D_stat[i,2:(1+length(idsWithin))] <- temp[idsWithin]
-        setTxtProgressBar(pb,i)
+        if(verbose){
+            setTxtProgressBar(pb,i)
+        }
     }
-    close(pb)
+    if(verbose){
+        close(pb)
+    }
     colnames(M3D_stat) <- c('MeanBetween',ColumnNames[idsWithin])
     return(M3D_stat)
 }

@@ -40,26 +40,44 @@ M3D_Wrapper <- function(rrbs, overlaps, para=FALSE){
         numPairs <- length(samplesIdx[,1])
     }
 
+
+    # store objects here to avoid slow lookups, potential memory hazard
+    m_reads <- methReads(rrbs)
+    t_reads <- totalReads(rrbs)
+    locs_all <- start(ranges(rowRanges(rrbs)))
+    q_hits <- queryHits(overlaps)
+    sub_hits <- subjectHits((overlaps))
+
     islands <- unique(queryHits(overlaps))
     CSites <- rowRanges(rrbs)
     MMD <- matrix(NA,nrow=length(islands),ncol=numPairs)
     MMDCoverage <- matrix(NA,nrow=length(islands),ncol=numPairs)
-    ColumnNames <- vector()
-    col_sample_names <- colnames(methReads(rrbs))
+    col_sample_names <- colnames(m_reads)
 
+    ### make colnames - vectorize
+    ColumnNames <- unlist(lapply(1:numPairs, function(pairInd){
+        if (numPairs==1){
+            pair <- c(1,2)
+        } else {
+            pair <- samplesIdx[pairInd,]
+        }
+        sample1 <- colnames(m_reads)[pair[1]]
+        sample2 <- colnames(m_reads)[pair[2]]
+        return(paste(sample1, ' vs ', sample2))
+    }))
 
     # loop over islands, then over samples
     pb <- txtProgressBar(min=1,max=length(islands),style=3)
     for (i in 1:length(islands)) {
         island <- islands[i]
-        methIndices <- subjectHits(overlaps[queryHits(overlaps)==island])
-        meth_isl <- methReads(rrbs)[methIndices,]
-        total_isl <- totalReads(rrbs)[methIndices,]
+        methIndices <- sub_hits[q_hits==island]
+        meth_isl <- m_reads[methIndices,]
+        total_isl <- t_reads[methIndices,]
         unmeth_isl <- total_isl - meth_isl
 
         # compute the location matrix
         ## define easy labels
-        locs <- start(ranges(CSites[methIndices]))
+        locs <- locs_all[methIndices]
         locs <- locs - min(locs)
         # make location matrix
         G <- locs%*%t(locs)
@@ -103,5 +121,4 @@ M3D_Wrapper <- function(rrbs, overlaps, para=FALSE){
     } else {
         return(cbind(MMD,MMDCoverage))
     }
-
 }
